@@ -1,0 +1,10 @@
+.message {
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    margin: 5px;
+    padding-left: 7px;
+}
+
+#chat-messages {
+    overflow-y: scroll; height: 75vh;
+}
