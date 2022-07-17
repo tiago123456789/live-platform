@@ -4,12 +4,16 @@ import { get, get as getAccessToken, getValueByKey } from "../services/Token";
 import api from "../services/Api"
 import { finishChannelStream, startChannelStream } from "../services/Channel";
 import { Link } from "react-router-dom";
+import webSocket from "../services/Websocket"
+
+const socket = webSocket()
 
 export default () => {
+    let peers = [];
     let videoRef = useRef()
-    let localStream;
-    let localScreen;
 
+    const [localStream, setLocalStream] = useState()
+    const [localScreen, setLocalScreen] = useState()
     const [channel, setChannel] = useState(null)
     const [description, setDescription] = useState("")
     const userId = getValueByKey("userId", getAccessToken())
@@ -19,16 +23,16 @@ export default () => {
             audio: true, video: true
         });
 
+        setLocalStream(stream)
         await startChannelStream(
             userId
         )
 
-        localStream = stream;
         videoRef.current.srcObject = stream;
     }
 
     const shareScreen = async () => {
-        localScreen = await navigator.mediaDevices.getDisplayMedia({
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
             video: {
                 mediaSource: "screen",
                 cursor: "always",
@@ -37,8 +41,8 @@ export default () => {
             },
             audio: true
         })
-
-        videoRef.current.srcObject = localScreen;
+        setLocalScreen(screenStream)
+        videoRef.current.srcObject = screenStream;
     }
 
     const stop = async (event) => {
@@ -49,7 +53,6 @@ export default () => {
             localStream.getTracks().forEach(track => track.stop())
         }
 
-        console.log("STOP STREAM NOW")
         await finishChannelStream(
             userId
         )
@@ -75,7 +78,70 @@ export default () => {
 
     useEffect(() => {
         getChannel();
+
     }, [])
+
+    useEffect(() => {
+        if (localStream != undefined || localScreen != undefined) {
+            const userId = getValueByKey("userId", getAccessToken())
+
+            socket.on(`new-viewer-${userId}`, async (data) => {
+                peers[data.socketId] = new RTCPeerConnection({})
+
+                if (localScreen) {
+                    localScreen.getTracks().forEach(track => {
+                        peers[data.socketId].addTrack(track, localScreen)
+                    })
+                    peers[data.socketId].addStream(localScreen);
+                }
+
+                if (localStream) {
+                    localStream.getTracks().forEach(track => {
+                        peers[data.socketId].addTrack(track, localStream)
+                    })
+                    peers[data.socketId].addStream(localStream);
+                }
+
+                peers[data.socketId].onicecandidate = ({ candidate }) => {
+                    socket.emit('ice-candidates', { candidate: candidate, to: data.socketId, sender: socket.id });
+                };
+
+                peers[data.socketId].onconnectionstatechange = ev => {
+                    switch (peers[data.socketId].connectionState) {
+                        case "disconnected":
+                        case "closed":
+                        case "failed":
+                            peers[data.socketId].close()
+                            break;
+                    }
+                }
+
+                peers[data.socketId].onsignalingstatechange = () => {
+                    switch (peers[data.socketId].signalingState) {
+                        case 'closed':
+                            peers[data.socketId].close()
+                            break;
+                    }
+                };
+
+                const offer = await peers[data.socketId].createOffer()
+                await peers[data.socketId].setLocalDescription(offer);
+                socket.emit("create-offer", { to: data.socketId, from: socket.id, offer })
+            })
+
+            socket.on("made-answer", async (data) => {
+                if (peers[data.from]) {
+                    await peers[data.from].setRemoteDescription(data.answer)
+                }
+            })
+
+            socket.on("ice-candidates", async (data) => {
+                if (data.candidate && !data.onicecandidate) {
+                    await peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate))
+                }
+            })
+        }
+    }, [localScreen, localStream])
 
     return (
         <>
@@ -117,9 +183,9 @@ export default () => {
                         <button className="btn btn-primary" onClick={() => start()}>Start live</button>&nbsp;
                         <button className="btn btn-danger" onClick={stop}>Stop live</button>&nbsp;
                         <button className="btn btn-primary" onClick={() => shareScreen()}>Share screen</button>
-                        &nbsp;<Link 
-                        className="btn btn-primary"
-                        to={`/channel/${userId}/bot-commands`}>
+                        &nbsp;<Link
+                            className="btn btn-primary"
+                            to={`/channel/${userId}/bot-commands`}>
                             Bot commands
                         </Link>
                     </div>

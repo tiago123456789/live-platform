@@ -11,6 +11,7 @@ import { OnlineChannelController } from './controllers/online-channel.controller
 import { UseModule } from 'src/user/user.module';
 import { OnlineChannelService } from './services/online-channel.service';
 import { ChatModule } from 'src/chat/chat.module';
+import { StreamListener } from './stream.listener';
 
 @Module({
   imports: [
@@ -33,6 +34,6 @@ import { ChatModule } from 'src/chat/chat.module';
     ChatModule
   ],
   controllers: [ChannelController, OnlineChannelController],
-  providers: [ChannelRepository, ChannelService, OnlineChannelService],
+  providers: [StreamListener, ChannelRepository, ChannelService, OnlineChannelService],
 })
 export class ChannelModule { }
