@@ -1,9 +1,10 @@
-import { Route, useNavigate } from "react-router-dom/"
+import { useContext } from "react";
 import Login from "../../pages/Login";
-import { isAuthenticated } from "../../services/Auth";
+import { AuthContext } from "../../providers/Auth";
 
 export default ({ component: Component }) => {
-    if (!isAuthenticated()) {
+    const { checkIfUserAuthenticated } = useContext(AuthContext);
+    if (!checkIfUserAuthenticated()) {
         return <Login />
     }
      

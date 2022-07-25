@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import * as AWS from 'aws-sdk';
 
 import { DatabaseInterface } from "src/common/database/database.interface";
-import { UserDto } from "./user.dto";
+import { UserDto } from "./dtos/user.dto";
 
 @Injectable()
 export class UserRepository {

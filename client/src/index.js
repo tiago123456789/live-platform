@@ -10,21 +10,32 @@ import NotFound from './pages/NotFound';
 import Channel from './pages/Channel';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import BotCommand from './pages/BotCommand';
+import { AuthProvider } from './providers/Auth';
+import { ChannelProvider } from './providers/Channel';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
-  <BrowserRouter>
-    <Routes>
-      <Route path="/channel/:channel/live" element={<ProtectedRoute component={App} />}/>
-      <Route path="/channel/:channel" element={<ProtectedRoute component={Channel} />}/>
-      <Route path="/oauth-callback" element={<OAuthCallback />}/>
-      <Route path="/login" element={<Login />}/>
-      <Route path="/lives" element={<ProtectedRoute component={Lives} /> } />
-      <Route path="/channel/:channel/bot-commands" element={<ProtectedRoute component={BotCommand} /> } />
-      <Route
-        path="*" element={<NotFound />} />
-    </Routes>
-  </BrowserRouter>
+  <AuthProvider>
+    <ChannelProvider>
+
+      <BrowserRouter>
+        <Routes>
+          <Route path="/channel/:channel/live" element={<ProtectedRoute component={App} />} />
+          <Route path="/channel/:channel" element={<ProtectedRoute component={Channel} />} />
+          <Route path="/lives" element={<ProtectedRoute component={Lives} />} />
+          <Route path="/channel/:channel/bot-commands" element={<ProtectedRoute component={BotCommand} />} />
+
+          <Route path="/oauth-callback" element={<OAuthCallback />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </ChannelProvider>
+    <ToastContainer />
+  </AuthProvider>
 );
 

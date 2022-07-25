@@ -12,3 +12,7 @@ export const startChannelStream = (id) => {
 export const finishChannelStream = (id) => {
     return api.delete(`http://localhost:3001/online-channels/${id}`)
 }
+
+export const createChannel = (data) => {
+    return api.post(`http://localhost:3001/channels`, data)
+}

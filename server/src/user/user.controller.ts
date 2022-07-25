@@ -1,5 +1,5 @@
 import { Body, Controller, Post } from "@nestjs/common";
-import { OAuth2CodeCredentialDto } from "./oauth2-code-credential.dto";
+import { OAuth2CodeCredentialDto } from "./dtos/oauth2-code-credential.dto";
 import { UserService } from "./user.service";
 
 @Controller("/users")

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { HttpClientInterface } from "src/common/http-client/http-client.interface";
-import { OAuth2CodeCredentialDto } from "./oauth2-code-credential.dto";
+import { OAuth2CodeCredentialDto } from "./dtos/oauth2-code-credential.dto";
 import { UserRepository } from "./user.repository";
 
 @Injectable()
@@ -51,7 +51,8 @@ export class UserService {
 
         const token = this.jwtService.sign({
             userId: user.id,
-            username: user.login
+            username: user.login,
+            avatar_url: user.avatar_url,
         })
 
         return {

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import Header from "../components/Header"
-import { get, get as getAccessToken, getValueByKey } from "../services/Token";
-import api from "../services/Api"
-import { finishChannelStream, startChannelStream } from "../services/Channel";
+import { get as getAccessToken, getValueByKey } from "../services/Token";
+import { finishChannelStream, startChannelStream, createChannel } from "../services/Channel";
 import { Link } from "react-router-dom";
 import webSocket from "../services/Websocket"
+import { ChannelContext } from "../providers/Channel";
+import { getUserCameraAndAudio, getUserScreen, replaceVideoStream, startStreamNewUser, stopStream } from "../utils/Stream";
 
 const socket = webSocket()
 
@@ -14,16 +15,15 @@ export default () => {
 
     const [localStream, setLocalStream] = useState()
     const [localScreen, setLocalScreen] = useState()
+    const { hasChannel, setHasChannel } = useContext(ChannelContext)
     const [channel, setChannel] = useState(null)
     const [description, setDescription] = useState("")
     const userId = getValueByKey("userId", getAccessToken())
 
     const start = async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true, video: true
-        });
-
+        const stream = await getUserCameraAndAudio();
         setLocalStream(stream)
+        replaceVideoStream(peers, stream)
         await startChannelStream(
             userId
         )
@@ -32,27 +32,19 @@ export default () => {
     }
 
     const shareScreen = async () => {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-            video: {
-                mediaSource: "screen",
-                cursor: "always",
-                width: { ideal: 1920, max: 1920 },
-                height: { ideal: 1080, max: 1080 }
-            },
-            audio: true
-        })
+        const screenStream = await getUserScreen()
+        replaceVideoStream(peers, screenStream)
         setLocalScreen(screenStream)
+        await startChannelStream(
+            userId
+        )
         videoRef.current.srcObject = screenStream;
     }
 
     const stop = async (event) => {
         event.preventDefault();
-        if (localScreen) {
-            localScreen.getTracks().forEach(track => track.stop())
-        } else if (localStream) {
-            localStream.getTracks().forEach(track => track.stop())
-        }
-
+        stopStream(localScreen)
+        stopStream(localStream)
         await finishChannelStream(
             userId
         )
@@ -61,72 +53,19 @@ export default () => {
 
     const create = async (event) => {
         event.preventDefault()
-        await api.post(`http://localhost:3001/channels`, { description })
+        await createChannel({ description })
         setChannel({ description })
+        setHasChannel(true)
     }
-
-    const getChannel = async () => {
-        try {
-            const userId = getValueByKey("userId", getAccessToken())
-            const response = await api.get(`http://localhost:3001/channels/${userId}`)
-            setChannel(response.data)
-        } catch (error) {
-            setChannel(null)
-        }
-
-    }
-
-    useEffect(() => {
-        getChannel();
-
-    }, [])
 
     useEffect(() => {
         if (localStream != undefined || localScreen != undefined) {
             const userId = getValueByKey("userId", getAccessToken())
 
             socket.on(`new-viewer-${userId}`, async (data) => {
-                peers[data.socketId] = new RTCPeerConnection({})
-
-                if (localScreen) {
-                    localScreen.getTracks().forEach(track => {
-                        peers[data.socketId].addTrack(track, localScreen)
-                    })
-                    peers[data.socketId].addStream(localScreen);
-                }
-
-                if (localStream) {
-                    localStream.getTracks().forEach(track => {
-                        peers[data.socketId].addTrack(track, localStream)
-                    })
-                    peers[data.socketId].addStream(localStream);
-                }
-
-                peers[data.socketId].onicecandidate = ({ candidate }) => {
-                    socket.emit('ice-candidates', { candidate: candidate, to: data.socketId, sender: socket.id });
-                };
-
-                peers[data.socketId].onconnectionstatechange = ev => {
-                    switch (peers[data.socketId].connectionState) {
-                        case "disconnected":
-                        case "closed":
-                        case "failed":
-                            peers[data.socketId].close()
-                            break;
-                    }
-                }
-
-                peers[data.socketId].onsignalingstatechange = () => {
-                    switch (peers[data.socketId].signalingState) {
-                        case 'closed':
-                            peers[data.socketId].close()
-                            break;
-                    }
-                };
-
-                const offer = await peers[data.socketId].createOffer()
-                await peers[data.socketId].setLocalDescription(offer);
-                socket.emit("create-offer", { to: data.socketId, from: socket.id, offer })
+                await startStreamNewUser(
+                    data, peers, localScreen, localStream, socket 
+                )
             })
 
             socket.on("made-answer", async (data) => {
@@ -147,11 +86,7 @@ export default () => {
         <>
             <Header />
             <section className="container">
-                {channel == null &&
-                    <button className="btn btn-primary mt-3 mb-2">Create channel</button>
-                }
-
-                {channel == null &&
+                { hasChannel === false &&
                     <div className="row">
                         <form className="col-md-11">
                             <h3>Data for create channel</h3>
